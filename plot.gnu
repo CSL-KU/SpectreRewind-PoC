@@ -24,7 +24,6 @@ set style line 4 lt rgb "#0000a0" lw 2 pt 9
 
 set yrange [0:*]
 set xrange [200:450]
-# 240:380]
 
 # set xtics nomirror rotate by -40 # scale 0 font ",24"
 set ylabel "Probability" offset 2
