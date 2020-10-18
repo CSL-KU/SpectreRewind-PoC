@@ -110,7 +110,10 @@ static inline uint64_t rdtsc() {
 volatile char zero = 0;
 volatile char ones = 0xff;
 
-double my_number = 123456778910;
+double my_number1 = 123456778910;
+double my_number2 = 123456778910;
+double my_number3 = 123456778910;
+double my_number4 = 123456778910;
 
 struct div_test
 {
@@ -163,7 +166,10 @@ int __attribute__ ((noinline)) transmit_bit( struct div_test * dt, int bit_no )
   double send1, send2, send3, send4;
   volatile char *ptr = dt->addr;
 
-  send1 = send2 = send3 = send4 = my_number;
+  send1 = my_number1;
+  send2 = my_number2;
+  send3 = my_number3;
+  send4 = my_number4;
   
   // receiver: control the speculation window size
   for (int i = 0; i < N_DIVS; i++) {
