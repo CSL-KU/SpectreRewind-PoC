@@ -32,6 +32,8 @@
 #include <time.h>
 #include <inttypes.h>
 #include <stdio.h>
+#include <pthread.h>
+#include <sys/mman.h>
 
 /**************************************************************************
  * Public Definitions
@@ -48,9 +50,10 @@ typedef struct {
  * Global Variables
  **************************************************************************/
 static int dbg = 1;
-static volatile uint64_t counter = 0;
+static volatile uint64_t* counter = 0;
 static libkdump_config_t config;
 typedef enum { ERROR, INFO, SUCCESS } d_sym_t;
+static pthread_t count_thread;
 
 /**************************************************************************
  * Public Function Prototypes
@@ -82,7 +85,7 @@ static void debug(d_sym_t symbol, const char *fmt, ...) {
 #if defined(__aarch64__)
 static inline uint64_t rdtsc() {
   asm volatile ("DSB SY");	
-  return counter;
+  return *counter;
 }
 
 #else // !__aarch64__	
@@ -209,6 +212,14 @@ uint64_t now_in_ns()
   return ((uint64_t)ts.tv_sec * 1000000000 + ts.tv_nsec);
 }
 
+static void *countthread(void *dummy) {
+  uint64_t local_counter = 0;
+  while (1) {
+    local_counter++;
+    *counter = local_counter;
+  }
+}
+
 // ---------------------------------------------------------------------------
 static void __attribute__((optimize("-O2"), noinline)) detect_spectrerewind_threshold()
 {
@@ -229,6 +240,11 @@ static void __attribute__((optimize("-O2"), noinline)) detect_spectrerewind_thre
   transmit_1.div = 1;
   transmit_1.addr = &ones; // (char *)libkdump_phys_to_virt(libkdump_virt_to_phys((size_t)&ones));
   
+#if defined(__aarch64__)
+  counter = (volatile uint64_t *)mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, -1, 0);
+  int r = pthread_create(&count_thread, 0, countthread , 0);
+#endif
+
   int n_addr = sizeof(test_tasks)/sizeof(test_tasks[0]);
 
   bw_start = now_in_ns();
@@ -293,7 +309,6 @@ static void __attribute__((optimize("-O2"), noinline)) detect_spectrerewind_thre
               histo[0][i]/overall, histo[1][i]/overall, histo[2][i]/overall );
     }
   }
-
 }
 
 int main(int argc, char *argv[])
