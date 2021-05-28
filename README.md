@@ -20,7 +20,7 @@ To run a SpectreRewind attack and plot the results, the following commands shoul
 
 Below is the histogram showing the results on our machine.
 
-![alt text](./figs/i5-6500_libk_hist.pdf)
+![i5-6500](./figs/i5-6500_libk_hist.png)
 
 	
 If necessary, the x-axis range of the graph can be changed by modifying line 26 in plot.gnu:
