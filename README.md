@@ -15,8 +15,13 @@ On Ubuntu-based systems, this can be done with:
 To run a SpectreRewind attack and plot the results, the following commands should be run:
 
 	$ make
-	$ ./detect-spr 2> hist.dat
+	$ ./detect_spr 2> hist.dat
 	$ gnuplot plot.gnu > hist.pdf
+
+Below is the histogram showing the results on our machine.
+
+![alt text](./figs/i5-6500_libk_hist.pdf)
+
 	
 If necessary, the x-axis range of the graph can be changed by modifying line 26 in plot.gnu:
 
