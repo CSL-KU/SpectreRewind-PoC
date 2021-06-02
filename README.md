@@ -32,7 +32,7 @@ Replace 200 and 450 to set new lower and upper bounds for the x-axis, respective
 
 ## Citation
 
-The paper for SpectreRewind can be found [here](http://www.ittc.ku.edu/~heechul/papers/spectrerewind-ashes2020-camera.pdf). 
+The SpectreRewind paper can be found [here](http://www.ittc.ku.edu/~heechul/papers/spectrerewind-ashes2020-camera.pdf). 
 Please use the following BibTex entry for citation:
 
 ```
