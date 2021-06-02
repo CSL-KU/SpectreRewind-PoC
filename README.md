@@ -28,3 +28,19 @@ If necessary, the x-axis range of the graph can be changed by modifying line 26 
 	set xrange [200:450]
 
 Replace 200 and 450 to set new lower and upper bounds for the x-axis, respectively.
+
+
+## Citation
+
+The SpectreRewind paper can be found [here](http://www.ittc.ku.edu/~heechul/papers/spectrerewind-ashes2020-camera.pdf). 
+Please use the following BibTex entry for citation:
+
+```
+@inproceedings{fustos2020spectrerewind,
+  title={SpectreRewind: Leaking Secrets to Past Instructions},
+  author={Fustos, Jacob and Bechtel, Michael and Yun, Heechul},
+  booktitle={Proceedings of the 4th ACM Workshop on Attacks and Solutions in Hardware Security},
+  pages={117--126},
+  year={2020}
+}
+```
