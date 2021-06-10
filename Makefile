@@ -1,6 +1,6 @@
 .PHONY: all clean
 
-CFLAGS=-O2 -funroll-loops
+CFLAGS=-O2 # -funroll-loops
 
 all: detect_spr
 

@@ -163,9 +163,9 @@ int __attribute__ ((noinline)) transmit_bit( struct div_test * dt, int bit_no )
   // receiver: control the speculation window size
   for (int i = 0; i < N_DIVS; i++) {
     recv_num /= div;
-    recv_num += 0;
+    // recv_num += 0;
   }
-  if (recv_num == 1) { // trained true, but false when sending
+  if (recv_num == 1.0) { // trained true, but false when sending
     if ( *ptr & (1 << bit_no) ) { // trained false, but true when sending
       for (int x = 0; x < 100; x++) { // generate lots of contention
         send1 /= div;
