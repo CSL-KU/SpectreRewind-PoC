@@ -34,6 +34,8 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <sys/mman.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 
 /**************************************************************************
  * Public Definitions
@@ -302,5 +304,9 @@ static void __attribute__((optimize("-O2"), noinline)) detect_spectrerewind_thre
 
 int main(int argc, char *argv[])
 {
+  if (setpriority(PRIO_PROCESS, 0, -20) < 0) {
+    debug(ERROR, "priority -20 failed\n");
+  }
+
   detect_spectrerewind_threshold();
 }
