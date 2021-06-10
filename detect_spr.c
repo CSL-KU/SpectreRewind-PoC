@@ -146,17 +146,6 @@ struct div_test *test_tasks[] = {
     &transmit_1,
 };
 
-struct div_test *tasks[] = {
-    &trainer,
-    &trainer,
-    &trainer,
-    &trainer,
-    &trainer,
-    &trainer,
-    &trainer,
-    &transmit  // >7+ training + transmit
-};
-
 #define N_DIVS 12   // determine speculative execution length
 
 int __attribute__ ((noinline)) transmit_bit( struct div_test * dt, int bit_no )
