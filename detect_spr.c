@@ -133,13 +133,31 @@ struct div_test transmit_0;
 struct div_test transmit_1;
 struct div_test transmit;
 
+/* 
+ * micro arch.   minimum # training runs
+ * ------------------------------------
+ * cortex-a72    5
+ * cortex-a57    2
+ * icelake       9
+ * tigerlake     9
+ * all others    7
+ * default       9 (works on all tested platforms)
+ */ 
 struct div_test *test_tasks[] = {
     &trainer,
     &trainer,
     &trainer,
     &trainer,
     &trainer,
+    &trainer,
+    &trainer,
+    &trainer,
+    &trainer,
     &transmit_0,
+    &trainer,
+    &trainer,
+    &trainer,
+    &trainer,
     &trainer,
     &trainer,
     &trainer,
