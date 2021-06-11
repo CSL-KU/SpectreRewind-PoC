@@ -244,7 +244,7 @@ static void __attribute__((optimize("-O2"), noinline)) detect_spectrerewind_thre
       for (volatile int iter = 0; iter < 13; iter++); // IMPORTANT: add delay (> 13).
         
       start = rdtsc();
-      transmit_bit(test_tasks[i], 0); // send secret when (i%8==7).
+      transmit_bit(test_tasks[i], i%8); // send secret when (i%8==7).
       end = rdtsc();
       
       dur = end - start;
