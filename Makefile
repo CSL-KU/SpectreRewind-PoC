@@ -1,12 +1,10 @@
 .PHONY: all clean
 
-CFLAGS=-O2
+CFLAGS=-O2 -pthread
+CC=gcc
 
-all: detect_spr
-
-detect_spr: detect_spr.c
-	gcc -pthread $(CFLAGS) $< -o $@
-	gcc -pthread $(CFLAGS) $< -S
+BINS=detect_spr detect_spr-opt
+all: $(BINS)
 
 clean:
-	rm -rf detect_spr
+	rm -rf $(BINS)
