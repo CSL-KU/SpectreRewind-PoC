@@ -144,7 +144,7 @@ struct div_test transmit;
  * all others    7
  * default       9 (works on all tested platforms)
  */ 
-struct div_test *test_tasks[20];
+struct div_test *test_tasks[100];
 
 int __attribute__ ((noinline)) transmit_bit( struct div_test * dt, int bit_no )
 {
