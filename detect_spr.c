@@ -245,7 +245,7 @@ static void __attribute__((optimize("-O2"), noinline)) detect_spectrerewind_thre
 	if (dur < MAX_CYCLES) histo[0][dur]++;
 	total[0][j] = dur;
       } else if (test_tasks[i] == &transmit_1) {
-	if (dur < MAX_CYCLES) histo[0][dur]++;
+	if (dur < MAX_CYCLES) histo[1][dur]++;
 	total[1][j] = dur;
       }
     }
