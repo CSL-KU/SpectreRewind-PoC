@@ -137,10 +137,11 @@ struct div_test transmit;
 /* 
  * micro arch.   minimum # training runs
  * ------------------------------------
- * cortex-a72    5
+ * cortex-a72    3
  * cortex-a57    2
  * icelake       9
  * tigerlake     9
+ * ryzen         4
  * all others    7
  * default       9 (works on all tested platforms)
  */ 
