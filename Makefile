@@ -3,7 +3,7 @@
 CFLAGS=-O2 -pthread
 CC=gcc
 
-BINS=detect_spr detect_spr-opt
+BINS=detect_spr
 all: $(BINS)
 
 clean:
