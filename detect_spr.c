@@ -268,13 +268,13 @@ static void __attribute__((optimize("-O2"), noinline)) detect_spectrerewind_thre
   }
   debug(SUCCESS, "spectrerewind: divsd ch threshold: %d cycles\n", config.divsd_threshold);
 
-  int err0_cnt = 0, err1_cnt = 0;
+  int err0_cnt = -1, err1_cnt = -1;
   for (int j = 0; j < N_TESTS; j++) {
-    if (err0_cnt == 0 && total[0][N_TESTS-j-1] <= config.divsd_threshold) {
+    if (err0_cnt == -1 && total[0][N_TESTS-j-1] <= config.divsd_threshold) {
       debug(INFO, "0 - Error count: %d/%d, rate: %.2f\%\n", j, N_TESTS, (float)j * 100/ N_TESTS);
       err0_cnt = j;
     }
-    if (err1_cnt == 0 && total[1][j] > config.divsd_threshold) {
+    if (err1_cnt == -1 && total[1][j] > config.divsd_threshold) {
       debug(INFO, "1 - Error count: %d/%d, rate: %.2f\%\n", j, N_TESTS, (float)j * 100/ N_TESTS);
       err1_cnt = j;
     }
