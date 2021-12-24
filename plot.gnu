@@ -29,16 +29,16 @@ set xrange [0:*]
 set ylabel "Probability" offset 2
 set xlabel "Number of Clock Cycles" offset 2
 # set style data histogram
-set key at 430,140000
+# set key at 430,140000
 set key samplen 1 width 2
-set key autotitle columnhead
+# set key autotitle columnhead
 #set boxwidth 1
 #set arrow from -1,1 to 4,1 nohead lt 2
 # set arrow from 0.6,0 to 0.6,1.4 nohead lt 1
 
 # set label "4.99" at 1.45,5 font ",16" front
 set style fill pattern
-plot "hist.dat" using 1:2 with boxes, "hist.dat" using 1:3 with boxes 
+plot "hist.dat" using 1:2 title "0" with boxes, "hist.dat" using 1:3 title "1" with boxes 
 #       ''          using  5:xticlabel(1) fs pattern 1 lt -1,\
 #       ''          using  6:xticlabel(1) fs pattern 2 lt -1,\
 #       ''          using  3:xticlabel(1) fs pattern 3 lt -1,\
