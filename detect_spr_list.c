@@ -212,15 +212,13 @@ static void __attribute__((optimize("-O2"), noinline)) detect_spectrerewind_thre
   uint64_t bw_start = 0, bw_end = 0;
   double overall = N_TESTS;
 
-  int next;
-  next = random_data[0];
-  linked[0][256] = next;
-  while( next != 0 )
+  int next = 0;
+  do
   {
     int current = next;
     next = random_data[current];
     linked[current][256] = next;
-  }
+  } while( next != 0 );
 
   start = 0;
 
