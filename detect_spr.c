@@ -218,11 +218,11 @@ static void __attribute__((optimize("-O2"), noinline)) detect_spectrerewind_thre
   trainer.addr = &zero; // training 
 
   transmit_0.number = 150;
-  transmit_0.div = 1.1;
+  transmit_0.div = 1;
   transmit_0.addr = &zero;
   
   transmit_1.number = 150;
-  transmit_1.div = 1.1;
+  transmit_1.div = 1;
   transmit_1.addr = &ones; // (char *)libkdump_phys_to_virt(libkdump_virt_to_phys((size_t)&ones));
   
   int n_addr = (g_bp_depth + 1) * 2; //
