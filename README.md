@@ -30,6 +30,10 @@ If necessary, the x-axis range of the graph can be changed by modifying line 26 
 Replace 200 and 450 to set new lower and upper bounds for the x-axis, respectively.
 
 
+## Other PoC Examples
+[SpectreRewdin in JavaScript] (./README-js.md)
+[SpectreRewind in Meltdown](./README-meltdown.md)
+
 ## Citation
 
 The SpectreRewind paper can be found [here](http://www.ittc.ku.edu/~heechul/papers/spectrerewind-ashes2020-camera.pdf). 
