@@ -18,6 +18,7 @@ We tested it on ubuntu 20.04 with the docker version 20.10.12.
 You can launch the docker image as follows. This will automatically launch the script within the browser.
 
 ```
+$ xauth +
 $ XAUTH=/tmp/.docker.xauth
 $ XSOCK=/tmp/.X11-unix
 $ docker run -ti -v $XSOCK:$XSOCK -v $XAUTH:$XAUTH -v$PWD:/host -e XAUTHORITY=$XAUTH sprjs:chrome62
