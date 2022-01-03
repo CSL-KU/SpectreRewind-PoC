@@ -4,7 +4,7 @@ This repository contains a PoC for demonstrating the SpectreRewind attack in Jav
 
 ## Prerequisites
 
-We use Docker to safely luanch [Google Chrome version 62.0.3202.75](https://www.slimjet.com/chrome/download-chrome.php?file=lnx%2Fchrome64_62.0.3202.75.deb) (earlier versions also should work).
+We use Docker to safely launch [Google Chrome version 62.0.3202.75](https://www.slimjet.com/chrome/download-chrome.php?file=lnx%2Fchrome64_62.0.3202.75.deb) (earlier versions also should work).
 
 You can build a docker image with the provided the Dockerfile as follows.
 
@@ -18,10 +18,10 @@ We tested it on ubuntu 20.04 with the docker version 20.10.12.
 You can launch the docker image as follows. This will automatically launch the script within the browser.
 
 ```
-$ xauth +
+$ xhost +
 $ XAUTH=/tmp/.docker.xauth
 $ XSOCK=/tmp/.X11-unix
-$ docker run -ti -v $XSOCK:$XSOCK -v $XAUTH:$XAUTH -v$PWD:/host -e XAUTHORITY=$XAUTH sprjs:chrome62
+$ docker run -ti -v $XSOCK:$XSOCK -v $XAUTH:$XAUTH -v $PWD:/host -e XAUTHORITY=$XAUTH -e DISPLAY=$DISPLAY sprjs:chrome62
 ```
 You then copy the experiment results shown in the browser screen and store them as hist.dat on the host.
 
