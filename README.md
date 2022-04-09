@@ -32,7 +32,7 @@ Replace 200 and 450 to set new lower and upper bounds for the x-axis, respective
 
 ## Other PoC Examples
 
-- [SpectreRewdin in JavaScript](./README-js.md)
+- [SpectreRewind in JavaScript](./README-js.md)
 - [SpectreRewind in Meltdown](./README-meltdown.md)
 
 ## Citation
