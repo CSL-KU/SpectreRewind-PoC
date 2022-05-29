@@ -49,3 +49,14 @@ Please use the following BibTex entry for citation:
   year={2020}
 }
 ```
+The journal extension can be found [here](https://www.ittc.ku.edu/~heechul/papers/spectrerewind-jcen2022-camera.pdf). Please use the following BibTex entry for citation.
+```
+@article{fustos2022framework,
+  title={A framework for leaking secrets to past instructions},
+  author={Fustos, Jacob and Bechtel, Michael and Yun, Heechul},
+  journal={Journal of Cryptographic Engineering},
+  pages={1--13},
+  year={2022},
+  publisher={Springer Berlin Heidelberg}
+}
+```
